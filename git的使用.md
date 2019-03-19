@@ -230,29 +230,37 @@ git push origin --tags
 
 <br>
 和远程库关联
-```language
+
+```java
 git remote add origin git@gitee.com:liaoxuefeng/learngit.git
 ```
+
 查看远程库信息
-```language
+```java
 git remote -v  //查看所有的远程库
 ```
+
 删除关联的远程库
-```language
+```java
 git remote rm origin
 ```
 
+<br>
 可以将一些忽略文件放到.gitignore根目录的文件夹下
 
 <br>
 别名
+
 `git reset HEAD file`可以把暂存区的修改撤销掉（unstage）
+
 为了不每次都写得那么长，我们可以给`reset HEAD`起个别名叫unstage
-```language
+```java
 git config --global alias.unstage 'reset HEAD'
 ```
+
 这样再进行修改撤销操作时可以
-```language
+```java
 git unstage file //设置完别名后 和git reset HEAD file命令一样
 ```
+
 如果需要删除别名，可以直接到.git/config文件中进行修改或删除
