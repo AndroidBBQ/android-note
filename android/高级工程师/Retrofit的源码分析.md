@@ -432,9 +432,10 @@ ServiceMethod(Builder<R, T> builder) {
     this.args = args;
   }
 ```
+
 可以看到这步非常简单，就是将方法和参数封装。
 
-** 第三步：把okHttpCall进一步封装并返回Call对象**
+**第三步：把okHttpCall进一步封装并返回Call对象**
 
 先再来看下再Retrofit得create方法中对这步的调用
 ```java
