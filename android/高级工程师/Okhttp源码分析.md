@@ -595,16 +595,84 @@ Response getResponseWithInterceptorChain() throws IOException {
     return chain.proceed(originalRequest);
   }
 ```
+这里使用到了责任链的模式，具体的可以参考 责任链模式 
 
+上述代码中可以看出interceptors，是传递到了RealInterceptorChain该类实现Interceptor.Chain，并且执行了chain.proceed(originalRequest)。
 
+具体的处理逻辑在 RealInterceptorChain 的 proceed 方法中，体现了责任链模式。
 
+以前并没有具体的注意具体的责任链调用，RealInterceptorChain 可以说是真正把这些拦截器串起来的一个角色。一个个拦截器就像一颗颗珠子，而 RealInterceptorChain 就是把这些珠子串连起来的那根绳子。下面就是核心代码，仔细理解。
+```java
 
+public final class RealInterceptorChain implements Interceptor.Chain {
+	//将参数封装
+	 public RealInterceptorChain(List<Interceptor> interceptors, StreamAllocation streamAllocation,
+      HttpCodec httpCodec, int index, Request request, Call call) {
+    	this.interceptors = interceptors;
+    	this.connection = connection;
+    	this.streamAllocation = streamAllocation;
+    	this.httpCodec = httpCodec;
+    	this.index = index;
+    	this.request = request;
+    	this.call = call;
+   }
+   //处理request，并返回response
+	public Response proceed(Request request) throws IOException {
+	    return proceed(request, streamAllocation, httpCodec, connection);
+	}
+    //具体的调用
+	public Response proceed(Request request, StreamAllocation streamAllocation, HttpCodec httpCodec,
+	      RealConnection connection) throws IOException {
+		//得到下一次对应的 RealInterceptorChain
+	    RealInterceptorChain next = new RealInterceptorChain(interceptors,streamAllocation, httpCodec,connection,
+	    	index + 1, //
+	        request, call, eventListener,
+	        connectTimeout, readTimeout,writeTimeout);
+	    //当前次数的 interceptor
+	    Interceptor interceptor = interceptors.get(index);
+	    //进行拦截处理，并且在 interceptor 链式调用 next 的 proceed 方法
+	    Response response = interceptor.intercept(next);
+	    return response;
+	  }
+}
+```
+上面看到 RealInterceptorChain 实现了 Interceptor.Chain 看一下 Interceptor
+```java
+public interface Interceptor {
+  Response intercept(Chain chain) throws IOException;
 
+  interface Chain {
+     Response proceed(Request request) throws IOException;
+  }
+}
+```
+大致情形，通过源码大致了解了，逻辑就是，先构建下一个拦截器封装到 RealInterceptorChain ，然后获取当前的拦截器，调用当前的拦截器的 intercept 方法，在这个方法中再次调用下一个拦截器的 intercept 方法，最后将 Response 向上返回。这就是责任链模式。
 
+下面上一张图来提供理解：
+![](https://raw.githubusercontent.com/xioabaiwenwen/upload-images/master/%E6%8B%A6%E6%88%AA%E5%99%A8.png)
 
+下面就是各个拦截器的，每个拦截器都是非常难得点，这里先大致得了解下每个拦截器做些什么就行了。
 
+##### RetryAndFollowUpInterceptor
+RetryAndFollowUpInterceptor 是用来失败重试以及重定向的拦截器
 
+##### BridgeInterceptor
+在 BridgeInterceptor 这一步，先把用户友好的请求进行重新构造，变成了向服务器发送的请求。
 
+之后调用 chain.proceed(requestBuilder.build()) 进行下一个拦截器的处理。
 
+等到后面的拦截器都处理完毕，得到响应。再把 networkResponse 转化成对用户友好的 response
 
+##### CacheInterceptor
+CacheInterceptor 做的事情就是根据请求拿到缓存，若没有缓存或者缓存失效，就进入网络请求阶段，否则会返回缓存。
 
+##### ConnectInterceptor
+先在连接池中找到可用的连接 resultConnection ，再结合 sink 和 source 创建出 HttpCodec 的对象。
+
+##### CallServerInterceptor
+在 CallServerInterceptor 中可见，关于请求和响应部分都是通过 HttpCodec 来实现的。而在 HttpCodec 内部又是通过 sink 和 source 来实现的。所以说到底还是 IO 流在起作用。
+
+对于上面得拦截器，太过于复杂了，本文主要得目的是了解okhttp的大致流程，忽略具体的细节。通过上面的分析基本上可以理解清楚Okhttp的流程，最重要的拦截器没有细说，这是因为里面非常复杂，每一个拦截器都可以分一个小节讲，而且分析整个okhttp的源码不能太沉迷于细节，否则会深入其中无法自拔，导致自己对源码都有恐惧。
+
+具体的拦截器可以参考：
+[okhttp源码分析](https://www.jianshu.com/p/37e26f4ea57b)
